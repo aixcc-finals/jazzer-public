@@ -16,6 +16,9 @@
 
 package com.example;
 
+import com.code_intelligence.jazzer.mutation.annotation.DoubleInRange;
+import com.code_intelligence.jazzer.mutation.annotation.NotNull;
+import com.code_intelligence.jazzer.mutation.annotation.WithUtf8Length;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -24,29 +27,22 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import com.code_intelligence.jazzer.api.FuzzedDataProvider;
+public class FilePathTraversal {
 
-public class FilePathTraversal  {
-
-    static {
-        System.setProperty("jazzer.fs_allowed_dirs",
-                System.getProperty("java.io.tmpdir") + "," +
-                        "/a/b/c/allowed");
+  public static void fuzzerTestOneInput(
+      @WithUtf8Length(max = 100) @NotNull String pathFromFuzzer,
+      @NotNull @DoubleInRange(min = 0.0, max = 1.0) Double fixedPathProbability) {
+    // Slow down the fuzzer a bit, otherwise it finds file path traversal way too quickly!
+    String path = fixedPathProbability < 0.95 ? "/a/b/c/fixed-path" : pathFromFuzzer;
+    try {
+      Path p = Paths.get(path);
+      try (BufferedReader r = Files.newBufferedReader(p, StandardCharsets.UTF_8)) {
+        r.read();
+      } catch (IOException ignored) {
+        // swallow
+      }
+    } catch (InvalidPathException ignored) {
+      // swallow
     }
-
-    public static void fuzzerTestOneInput(FuzzedDataProvider fuzzedDataProvider) {
-        String data = fuzzedDataProvider.consumeString(100);
-        String path = fuzzedDataProvider.consumeProbabilityDouble() < 0.1 ?
-                "/a/b/d/e/jazzer-traversal" : data;
-        try {
-            Path p = Paths.get(path);
-            try (BufferedReader r = Files.newBufferedReader(p, StandardCharsets.UTF_8)) {
-                r.read();
-            } catch (IOException ignored) {
-                //swallow
-            }
-        } catch (InvalidPathException ignored) {
-            //swallow
-        }
-    }
+  }
 }
